@@ -31,7 +31,7 @@ clean:
 	rm -vf "$(TARGZ_FILENAME)"
 
 test:
-	rm -v .artifacts
+	[ -e .artifacts ] && rm -v .artifacts
 
 install:
 	install -d $(DESTDIR)/usr/share/doc/$(PROGNAME_VERSION)
