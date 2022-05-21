@@ -1,0 +1,7 @@
+results/*
+*.lock
+*.bak
+.*
+*.db
+*.sqlite3
+*.tmp

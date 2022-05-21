@@ -1,0 +1,31 @@
+name: Test new changes
+
+on:
+  push:
+    branches: [ '*', '!master' ]
+
+jobs:
+
+  test_new_changes:
+    name: Run tests and checks
+    runs-on: ubuntu-latest
+    outputs:
+      job_status: ${{ job.status }}
+
+    steps:
+
+    - name: Check out code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Install shellcheck
+      run: >-
+        apt-get install shellcheck
+
+    - name: Run shellcheck
+      run: >-
+        shellcheck fs_indexer.sh
+
+    - name: Run tests
+      run: make test
