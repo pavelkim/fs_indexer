@@ -26,12 +26,12 @@ find_exceptions=(
     -not -path "/cgroup/*"
 )
 
-du_exclude=(
-    --exclude /proc
-    --exclude /dev
-    --exclude /sys
-    --exclude /run
-)
+# du_exclude=(
+#     --exclude /proc
+#     --exclude /dev
+#     --exclude /sys
+#     --exclude /run
+# )
 
 output_dir="results/${today}"
 if [[ ! -d "${output_dir}" ]]; then
@@ -149,17 +149,17 @@ info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 # [[ "$?" != "0" ]] && error "Error while indexing dirs and files."
 # info "Finished dir and file size indexing"
 
-info "Starting file size indexing"
+info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
 find / "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}"
 [[ "$?" != "0" ]] && error "Error while finding files."
-info "Finished file size indexing"
+info "Finished file indexing"
 
-info "Starting md5sum indexing"
+info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
 find / "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}"
 [[ "$?" != "0" ]] && error "Error while finding files."
-info "Finished md5sum indexing"
+info "Finished checksum indexing"
 
 sed -e "s/^/${hostname}\t${scan_uuid}\t${now}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
 
@@ -273,24 +273,24 @@ sqlite3 "${sqlite_database}" << EOQ
 create view fs_index_last as
   select * 
   from fs_index
-  where scan_uuid = '${scan_uuid}';
+  where fs_index.scan_uuid = '${scan_uuid}';
 
 create view fs_checksum_last as
   select * 
   from fs_checksum
-  where scan_uuid = '${scan_uuid}';
+  where fs_checksum.scan_uuid = '${scan_uuid}';
 
 create view fs_full_report_last as
   select * 
   from fs_index join fs_checksum
   on fs_index.name = fs_checksum.name
-  where scan_uuid = '${scan_uuid}';
+  where fs_index.scan_uuid = '${scan_uuid}';
 
 create view fs_full_report_last as
   select * 
   from fs_index join fs_checksum
   on fs_index.name = fs_checksum.name
-  where scan_uuid = '${scan_uuid}';
+  where fs_index.scan_uuid = '${scan_uuid}';
 
 create view fs_checksum_diff_last as
   select name from (
