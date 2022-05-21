@@ -21,7 +21,7 @@ jobs:
 
     - name: Install shellcheck
       run: >-
-        apt-get install shellcheck
+        sudo apt-get install shellcheck
 
     - name: Run shellcheck
       run: >-
