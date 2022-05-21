@@ -31,7 +31,7 @@ clean:
 	rm -vf "$(TARGZ_FILENAME)"
 
 test:
-	[ -e .artifacts ] && rm -v .artifacts
+	@echo "noop"
 
 install:
 	install -d $(DESTDIR)/usr/share/doc/$(PROGNAME_VERSION)
