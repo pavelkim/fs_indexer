@@ -1,37 +1,9 @@
 #!/bin/bash
-# shellcheck disable=SC1091
-# shellcheck disable=SC2181
-# shellcheck disable=SC2015
+# shellcheck disable=SC1091,SC2181,SC2015
 #
 # Lists all files on file system: counts md5sum and filesizes
 #
-# v1.0.0 2016-01-24 Initial version (Pavel Kim)
-# v1.1.0 2018-02-21 Rearranged indexing stages (Pavel Kim)
-# v1.2.0 2021-06-16 Refactoring (Pavel Kim)
-# v1.3.0 2022-05-21 SQLite database support (Pavel Kim)
 
-# HEADER:
-# hostname                ${hostname}
-# scan_uuid               ${scan_uuid}
-# scan_time               ${now}
-# last_access_time        %AY-%Am-%Ad %AT
-# last_status_change_time %CY-%Cm-%Cd %CT
-# last_modification_time  %TY-%Tm-%Td %TT
-# depth_in_tree           %d
-# basename                %f
-# parent_directory        %h
-# group_name              %g
-# group_id                %G
-# user_name               %u
-# user_id                 %U
-# inode_number            %i
-# symlink_target          %l
-# hardlinks_count         %n
-# permissions_num         %#m
-# name                    %p
-# size_bytes              %s
-# type                    %y
-# selinux_context (excl.) %Z
 
 [[ -f ".config" ]] && source .config || :
 
@@ -52,6 +24,13 @@ find_exceptions=(
     -not -path "/run/*" 
     -not -path "/sys/*" 
     -not -path "/cgroup/*"
+)
+
+du_exclude=(
+    --exclude /proc
+    --exclude /dev
+    --exclude /sys
+    --exclude /run
 )
 
 output_dir="results/${today}"
@@ -158,17 +137,17 @@ mutex_start
 
 info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 
-info "Starting dir size indexing"
-info "Indexing output file: ${sizes_dir_output_filename}"
-du --exclude /proc --exclude /dev --exclude /sys --exclude /run -S / > "${sizes_dir_output_filename}"
-[[ "$?" != "0" ]] && error "Error while indexind dirs."
-info "Finished dir size indexing"
+# info "Starting dir size indexing"
+# info "Indexing output file: ${sizes_dir_output_filename}"
+# du "${du_exclude[@]}" -S / > "${sizes_dir_output_filename}"
+# [[ "$?" != "0" ]] && error "Error while indexind dirs."
+# info "Finished dir size indexing"
 
-info "Starting dir and file size indexing"
-info "Indexing output file: ${sizes_dir_file_output_filename}"
-du --exclude /proc --exclude /dev --exclude /sys --exclude /run -a / > "${sizes_dir_file_output_filename}"
-[[ "$?" != "0" ]] && error "Error while indexing dirs and files."
-info "Finished dir and file size indexing"
+# info "Starting dir and file size indexing"
+# info "Indexing output file: ${sizes_dir_file_output_filename}"
+# du "${du_exclude[@]}" -a / > "${sizes_dir_file_output_filename}"
+# [[ "$?" != "0" ]] && error "Error while indexing dirs and files."
+# info "Finished dir and file size indexing"
 
 info "Starting file size indexing"
 info "Indexing output file: ${index_output_filename}"
@@ -262,6 +241,20 @@ sqlite3 "${sqlite_database}" << EOQ
 .import ${checksum_output_filename}.tsv fs_checksum
 EOQ
 
+info "Get previous scan UUID from the database"
+
+previous_scan_uuid_filename=$( mktemp )
+info "Created a temporary file: '${previous_scan_uuid_filename}'"
+
+sqlite3 "${sqlite_database}" << EOQ > "${previous_scan_uuid_filename}"
+select scan_uuid
+from fs_scan_history
+order by id desc
+limit 1;
+EOQ
+
+previous_scan_uuid=$(cat "${previous_scan_uuid_filename}")
+info "Previous scan UUID: ${previous_scan_uuid}"
 
 info "Fixing up data types in the database"
 sqlite3 "${sqlite_database}" << EOQ
@@ -275,14 +268,50 @@ update fs_index set scan_time = DATETIME(scan_time),
 EOQ
 
 
-info "GZipping results"
-[[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
-gzip "${checksum_output_filename}"
-[[ "$?" != "0" ]] && error "Error while gzipping index."
+info "Creating views in the database"
+sqlite3 "${sqlite_database}" << EOQ
+create view fs_index_last as
+  select * 
+  from fs_index
+  where scan_uuid = '${scan_uuid}';
 
-[[ -f "${index_output_filename}.gz" ]] && rm -f "${index_output_filename}.gz"
-gzip "${index_output_filename}"
-[[ "$?" != "0" ]] && error "Error while gzipping sizes."
+create view fs_checksum_last as
+  select * 
+  from fs_checksum
+  where scan_uuid = '${scan_uuid}';
+
+create view fs_full_report_last as
+  select * 
+  from fs_index join fs_checksum
+  on fs_index.name = fs_checksum.name
+  where scan_uuid = '${scan_uuid}';
+
+create view fs_full_report_last as
+  select * 
+  from fs_index join fs_checksum
+  on fs_index.name = fs_checksum.name
+  where scan_uuid = '${scan_uuid}';
+
+create view fs_checksum_diff_last as
+  select name from (
+    select scan_uuid, name, checksum, count(name) as count 
+    from fs_checksum 
+    group by checksum, name 
+    order by count, name asc
+  )
+  where count = 1
+  group by name ;
+EOQ
+
+
+# info "GZipping results"
+# [[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
+# gzip "${checksum_output_filename}"
+# [[ "$?" != "0" ]] && error "Error while gzipping index."
+
+# [[ -f "${index_output_filename}.gz" ]] && rm -f "${index_output_filename}.gz"
+# gzip "${index_output_filename}"
+# [[ "$?" != "0" ]] && error "Error while gzipping sizes."
 
 [[ -f "${sizes_dir_output_filename}.gz" ]] && rm -f "${sizes_dir_output_filename}.gz"
 gzip "${sizes_dir_output_filename}"
@@ -295,7 +324,7 @@ gzip "${sizes_dir_file_output_filename}"
 
 info "Filesystem index: '${index_output_filename}.gz'"
 info "Checksum index: '${checksum_output_filename}.gz'"
-info "Full sizes index: '${sizes_dir_file_output_filename}.gz'"
-info "Directory sizes index: '${sizes_dir_output_filename}.gz'"
+# info "Full sizes index: '${sizes_dir_file_output_filename}.gz'"
+# info "Directory sizes index: '${sizes_dir_output_filename}.gz'"
 
 mutex_stop
