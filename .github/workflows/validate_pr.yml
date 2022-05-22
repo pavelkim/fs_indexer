@@ -71,7 +71,7 @@ jobs:
     - name: Comment new version on the pull request
       id: comment_pr
       run: |
-        URL="https://api.github.com/repos/${{github.repository}}/pulls/${{ github.event.pull_request.number }}/comments"
+        URL="https://api.github.com/repos/${{github.repository}}/issues/${{ github.event.pull_request.number }}/comments"
         echo "URL: ${URL}"
         
         curl \
