@@ -110,7 +110,7 @@ jobs:
 
       - name: Build
         run: >
-          make build
+          make build compress
 
       - name: Validate build artifact exists
         id: validate_artifact_exists
