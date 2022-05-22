@@ -154,13 +154,13 @@ info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 
 info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
-find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}"
+find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>result/find_index_output.log
 [[ "$?" != "0" ]] && error "Error while finding files."
 info "Finished file indexing"
 
 info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
-find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}"
+find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>result/find_checksum_output.log
 [[ "$?" != "0" ]] && error "Error while finding files."
 info "Finished checksum indexing"
 
