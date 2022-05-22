@@ -38,13 +38,16 @@ test:
 	cd "$(TMPDIR)"
 	@echo "TMPDIR: $(TMPDIR)"
 	@echo "PWD: $(PWD)"
+	@echo "PWD: ${PWD}"
 
-	sudo bash fs_indexer.sh
+	bash fs_indexer.sh
 	ls -la .
 
 	sqlite3 database.sqlite3 "select * from fs_scan_history"
 	sqlite3 database.sqlite3 "select * from fs_checksum"
 	sqlite3 database.sqlite3 "select * from fs_index"
+
+	tar -zcf /tmp/$(PROGNAME_VERSION)-test-results.tar.gz "${SCAN_ROOT}"
 
 	@echo "noop"
 

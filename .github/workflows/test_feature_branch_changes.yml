@@ -19,9 +19,19 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Install shellcheck
-      run: >-
-        sudo apt-get install shellcheck
+    - name: Check if .version file exists
+      id: version_file_exists
+      run: |
+        if [[ -f .version ]]; then 
+          echo "::set-output name=version_file_exists::true"
+        else 
+          echo "::set-output name=version_file_exists::false" 
+        fi
+
+    - name: Read out .version file
+      if: steps.version_file_exists.outputs.version_file_exists == 'true'
+      id: planned_version
+      run: echo "::set-output name=planned_version::$(cat .version)"
 
     - name: Run shellcheck
       run: >-
@@ -32,3 +42,9 @@ jobs:
 
     - name: Run tests
       run: make test
+
+    - name: Upload test results as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: fs_indexer-${{steps.planned_version.outputs.planned_version}}-test-results.tar.gz
+        path: /tmp/fs_indexer-${{steps.planned_version.outputs.planned_version}}-test-results.tar.gz
