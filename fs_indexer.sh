@@ -184,8 +184,8 @@ CREATE TABLE IF NOT EXISTS fs_index (
 );
 
 CREATE INDEX IF NOT EXISTS idx_fs_index_scan_uuid ON fs_index (scan_uuid);
-# CREATE INDEX IF NOT EXISTS idx_fs_index_name ON fs_index (name);
-# CREATE INDEX IF NOT EXISTS idx_fs_index_last_modification_time ON fs_index (last_modification_time);
+-- CREATE INDEX IF NOT EXISTS idx_fs_index_name ON fs_index (name);
+-- CREATE INDEX IF NOT EXISTS idx_fs_index_last_modification_time ON fs_index (last_modification_time);
 EOQ
 
 
@@ -203,8 +203,8 @@ CREATE TABLE IF NOT EXISTS fs_checksum (
 CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid_name ON fs_checksum (scan_uuid, name);
 CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum_name ON fs_checksum (checksum, name);
 CREATE INDEX IF NOT EXISTS idx_fs_checksum_name ON fs_checksum (name);
-# CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid ON fs_checksum (scan_uuid);
-# CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum ON fs_checksum (checksum);
+-- CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid ON fs_checksum (scan_uuid);
+-- CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum ON fs_checksum (checksum);
 EOQ
 
 
