@@ -81,8 +81,6 @@ jobs:
       TAG_EXISTS: ${{ needs.validate_new_version.outputs.tag_exists }}
       BRANCH_NAME: ${{ needs.validate_new_version.outputs.branch_name }}
       APP_NAME: "fs_indexer"
-      TARGETOS: "linux"
-      TARGETARCH: "amd64"
 
     if: >
       github.event_name == 'push'
@@ -124,7 +122,6 @@ jobs:
         id: docker_registry_login
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-#          echo "${{ secrets.QUAYIO_PASSWORD }}" | docker login quay.io -u "${{ secrets.QUAYIO_USERNAME }}" --password-stdin
 
       - name: Define version suffix
         id: version_suffix
@@ -137,28 +134,25 @@ jobs:
             long_suffix="${BRANCH_NAME}"
           fi
 
+
           echo "::set-output name=short::${short_suffix}"
           echo "::set-output name=long::${long_suffix}"
+
 
       - name: Build Docker image
         id: build_docker_image
         shell: bash
         run: >
           GITHUB_IMAGE_ID=$(echo "${{ github.repository }}/${APP_NAME}${IMAGE_ID}" | tr '[A-Z]' '[a-z]')
-#          QUAYIO_IMAGE_ID=$(echo "reinventedstuff/${APP_NAME}${IMAGE_ID}" | tr '[A-Z]' '[a-z]')
 
           docker build
           --tag "ghcr.io/${GITHUB_IMAGE_ID}:${PLANNED_VERSION}${{ steps.version_suffix.outputs.long }}"
-#          --tag "quay.io/${QUAYIO_IMAGE_ID}:${PLANNED_VERSION}${{ steps.version_suffix.outputs.long }}"
           --build-arg BUILD_VERSION="${PLANNED_VERSION}"
           --file Dockerfile
           .
 
       - name: Push Docker image to registry
         run: |
-          GITHUB_IMAGE_ID=$(echo "${{ github.repository }}/${APP_NAME}${IMAGE_ID}" | tr '[A-Z]' '[a-z]')
-#          QUAYIO_IMAGE_ID=$(echo "reinventedstuff/${APP_NAME}${IMAGE_ID}" | tr '[A-Z]' '[a-z]')
-          
+          GITHUB_IMAGE_ID=$(echo "${{ github.repository }}/${APP_NAME}${IMAGE_ID}" | tr '[A-Z]' '[a-z]')          
           docker push "ghcr.io/${GITHUB_IMAGE_ID}:${PLANNED_VERSION}${{ steps.version_suffix.outputs.long }}"
-#          docker push "quay.io/${QUAYIO_IMAGE_ID}:${PLANNED_VERSION}${{ steps.version_suffix.outputs.long }}" 
 
