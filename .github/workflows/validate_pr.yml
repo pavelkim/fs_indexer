@@ -67,3 +67,18 @@ jobs:
       id: validate
       if: steps.can_create.outputs.can_create != 'true'
       run: exit 1
+
+    - name: Comment new version on the pull request
+      id: comment_pr
+      run: |
+        URL="https://api.github.com/repos/${{github.repository}}/pulls/${{ github.event.pull_request.number }}/comments
+        echo "URL: ${URL}"
+        
+        curl \
+        -s \
+        -X POST \
+        -H 'authorization: Bearer ${{secrets.GITHUB_TOKEN}}' \
+        -H "Accept: application/vnd.github.v3+json" \
+        --url "${URL}" \
+        -d "{\"body\":\"v${{steps.planned_version.outputs.planned_version}} can be released\"}"
+
