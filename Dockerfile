@@ -6,7 +6,7 @@ ARG PROGNAME=fs_indexer
 WORKDIR /src
 ADD . /src
 
-RUN apk add bash make
+RUN apk add bash make uuidgen
 RUN make build
 
 
