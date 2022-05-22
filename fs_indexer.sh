@@ -9,13 +9,12 @@
 
 VERSION="0.0.0"
 today=$( date +%Y%m%d )
-now=$( date "+%F %T" )
 hostname=$( hostname )
 scan_uuid=$( uuidgen )
 
 [[ -z "${WORKDIR}" ]] && WORKDIR="$(pwd)"
 
-output_dir="${WORKDIR}/${today}"
+output_dir="${WORKDIR}/results/${today}"
 if [[ ! -d "${output_dir}" ]]; then
     mkdir -p "${output_dir}"
 fi
@@ -32,7 +31,7 @@ fi
 
 
 # TODO: Manage find_exceptions from config
-find_printf_format="${hostname}\t${scan_uuid}\t${now}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
+find_printf_format="${hostname}\t${scan_uuid}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
 find_exceptions=(
     -not -path "/dev/*" 
     -not -path "/proc/*" 
@@ -161,6 +160,7 @@ mutex_stop() {
 
 
 mutex_start
+scan_time_start=$( date "+%F %T" )
 
 info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 
@@ -176,8 +176,9 @@ chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -type f -exec md5sum {} \; 
 [[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: '${index_output_logfile}'"
 info "Finished checksum indexing"
 
-sed -e "s/^/${hostname}\t${scan_uuid}\t${now}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
+sed -e "s/^/${hostname}\t${scan_uuid}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
 
+scan_time_finish=$( date "+%F %T" )
 
 info "Loading collected data into SQLite database"
 
@@ -186,7 +187,6 @@ sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_index (
      hostname                TEXT,
      scan_uuid               TEXT,
-     scan_time               DATETIME,
      last_access_time        DATETIME,
      last_status_change_time DATETIME,
      last_modification_time  DATETIME,
@@ -217,7 +217,6 @@ sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_checksum (
      hostname      TEXT,
      scan_uuid     TEXT,
-     scan_time     DATETIME,
      checksum_type TEXT,
      checksum      TEXT,
      name          TEXT
@@ -235,17 +234,30 @@ info "Initialising schema for fs_scan_history table"
 sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_scan_history (
      id INTEGER PRIMARY KEY autoincrement,
-     scan_uuid text,
-     scan_time timestamp DEFAULT CURRENT_TIMESTAMP,
-     version text,
-     hostname text
-); 
+     scan_uuid        text,
+     scan_time_start  DATETIME,
+     scan_time_finish DATETIME,
+     version          text,
+     hostname         text
+);
 EOQ
 
 
 info "Registering scan in the scan history"
 sqlite3 "${SQLITE_DATABASE}" << EOQ
-INSERT INTO fs_scan_history (scan_uuid, hostname, version) VALUES ("${scan_uuid}", "${hostname}", "${VERSION}");
+INSERT INTO fs_scan_history (
+  scan_uuid,
+  hostname,
+  version,
+  scan_time_start,
+  scan_time_finish
+) VALUES (
+  "${scan_uuid}",
+  "${hostname}",
+  "${VERSION}",
+  DATETIME"${scan_time_start}",
+  DATETIME"${scan_time_finish}"
+);
 EOQ
 
 
