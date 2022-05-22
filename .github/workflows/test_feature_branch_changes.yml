@@ -19,6 +19,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install additional packages
+        run: >-
+          sudo apt-get install findutils
+
       - name: Check if .version file exists
         id: version_file_exists
         run: |
