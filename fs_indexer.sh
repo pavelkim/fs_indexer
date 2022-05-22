@@ -7,18 +7,31 @@
 
 [[ -f ".config" ]] && source .config || :
 
-VERSION="1.3.0"
+VERSION="0.0.0"
 today=$( date +%Y%m%d )
 now=$( date "+%F %T" )
 hostname=$( hostname )
 scan_uuid=$( uuidgen )
-sqlite_database="database.sqlite3"
+
+[[ -z "${WORKDIR}" ]] && GLOBAL_LOGLEVEL="${PWD}"
+
+output_dir="${WORKDIR}/${today}"
+if [[ ! -d "${output_dir}" ]]; then
+    mkdir -p "${output_dir}"
+fi
+
 
 [[ -z "${GLOBAL_LOGLEVEL}" ]] && GLOBAL_LOGLEVEL="4"
-[[ -z "${MUTEX_FILE}" ]] && MUTEX_FILE="$0.lock"
+[[ -z "${LOGFILE}" ]] && LOGFILE="${output_dir}/${hostname}.log"
+[[ -z "${MUTEX_FILE}" ]] && MUTEX_FILE="${WORKDIR}/${0}.lock"
+[[ -z "${SQLITE_DATABASE}" ]] && SQLITE_DATABASE="${WORKDIR}/database.sqlite3"
 
+# TODO: Check if SCAN_ROOT has a trailing /
 [[ -z "${SCAN_ROOT}" ]] && SCAN_ROOT="/"
 
+
+
+# TODO: Manage find_exceptions from config
 find_printf_format="${hostname}\t${scan_uuid}\t${now}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
 find_exceptions=(
     -not -path "${SCAN_ROOT%%*/}/dev/*" 
@@ -29,13 +42,13 @@ find_exceptions=(
     -not -path "${SCAN_ROOT%%*/}/swap"
 )
 
-output_dir="results/${today}"
-if [[ ! -d "${output_dir}" ]]; then
-    mkdir -p "${output_dir}"
-fi
-
+# TODO: Allow user to run more granular scans (more often than once per day)
 checksum_output_filename="${output_dir}/checksum_${hostname}_${today}.lst"
+checksum_output_logfile="${output_dir}/checksum_${hostname}_${today}.log"
 index_output_filename="${output_dir}/index_${hostname}_${today}.lst"
+index_output_logfile="${output_dir}/index_${hostname}_${today}.log"
+
+# TODO: Check for global variables to be defined in the functions
 
 timestamp() {
     date "+%F %T"
@@ -50,33 +63,43 @@ error() {
         [[ -n "${2}" ]] && rc="${2}" || rc=1
 
         echo "[$(timestamp)] ${BASH_SOURCE[1]}: line ${BASH_LINENO[0]}: ${FUNCNAME[1]}: ${msg}" >&2
+        echo "[$(timestamp)] ${BASH_SOURCE[1]}: line ${BASH_LINENO[0]}: ${FUNCNAME[1]}: ${msg}" >> "${LOGFILE}"
         exit "${rc}"
 }
 
 warning() {
 
-    local msg="$1"
-    local self_level=2
-    local self_level_name="warning"
+    local msg
+    local self_level
+    local self_level_name
+
+    msg="${1}"
+    self_level=2
+    self_level_name="warning"
 
     if [[ "${self_level}" -le "${GLOBAL_LOGLEVEL}" ]]; then 
         echo "[$(timestamp)] [${self_level_name}] [${FUNCNAME[1]}] ${msg}" >&2
+        echo "[$(timestamp)] [${self_level_name}] [${FUNCNAME[1]}] ${msg}" >> "${LOGFILE}"
         return 0
     fi
 }
+
 info() {
 
-    local msg="$1"
-    local self_level=3
-    local self_level_name="info"
+    local msg
+    local self_level
+    local self_level_name
+
+    msg="${1}"
+    self_level=3
+    self_level_name="info"
 
     if [[ "${self_level}" -le "${GLOBAL_LOGLEVEL}" ]]; then 
         echo "[$(timestamp)] [${self_level_name}] [${FUNCNAME[1]}] ${msg}" >&2
+        echo "[$(timestamp)] [${self_level_name}] [${FUNCNAME[1]}] ${msg}" >> "${LOGFILE}"
         return 0
     fi
 }
-
-
 
 create_mutex() {
     
@@ -143,13 +166,13 @@ info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 
 info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
-chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>results/find_index_output.log
+chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
 [[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: 'results/find_index_output.log'"
 info "Finished file indexing"
 
 info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
-chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>results/find_checksum_output.log
+chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
 [[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: 'results/find_checksum_output.log'"
 info "Finished checksum indexing"
 
@@ -159,7 +182,7 @@ sed -e "s/^/${hostname}\t${scan_uuid}\t${now}\tmd5\t/" -e "s/ \+ /\t/g" "${check
 info "Loading collected data into SQLite database"
 
 info "Initialising schema for fs_index table"
-sqlite3 "${sqlite_database}" << EOQ
+sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_index (
      hostname                TEXT,
      scan_uuid               TEXT,
@@ -190,7 +213,7 @@ EOQ
 
 
 info "Initialising schema for fs_checksum table"
-sqlite3 "${sqlite_database}" << EOQ
+sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_checksum (
      hostname      TEXT,
      scan_uuid     TEXT,
@@ -209,7 +232,7 @@ EOQ
 
 
 info "Initialising schema for fs_scan_history table"
-sqlite3 "${sqlite_database}" << EOQ
+sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_scan_history (
      id INTEGER PRIMARY KEY autoincrement,
      scan_uuid text,
@@ -221,13 +244,13 @@ EOQ
 
 
 info "Registering scan in the scan history"
-sqlite3 "${sqlite_database}" << EOQ
+sqlite3 "${SQLITE_DATABASE}" << EOQ
 INSERT INTO fs_scan_history (scan_uuid, hostname, version) VALUES ("${scan_uuid}", "${hostname}", "${VERSION}");
 EOQ
 
 
 info "Importing collected data into the database"
-sqlite3 "${sqlite_database}" << EOQ
+sqlite3 "${SQLITE_DATABASE}" << EOQ
 .mode csv
 .separator \t
 .import ${index_output_filename} fs_index
@@ -239,7 +262,7 @@ info "Get previous scan UUID from the database"
 previous_scan_uuid_filename=$( mktemp )
 info "Created a temporary file: '${previous_scan_uuid_filename}'"
 
-sqlite3 "${sqlite_database}" << EOQ > "${previous_scan_uuid_filename}"
+sqlite3 "${SQLITE_DATABASE}" << EOQ > "${previous_scan_uuid_filename}"
 SELECT scan_uuid
 FROM fs_scan_history
 ORDER BY id ASC
@@ -250,7 +273,7 @@ previous_scan_uuid=$(cat "${previous_scan_uuid_filename}")
 info "Previous scan UUID: ${previous_scan_uuid}"
 
 info "Fixing up data types in the database"
-sqlite3 "${sqlite_database}" << EOQ
+sqlite3 "${SQLITE_DATABASE}" << EOQ
 .mode csv
 .header off
 UPDATE fs_checksum
@@ -266,7 +289,7 @@ EOQ
 
 
 info "Creating views in the database"
-sqlite3 "${sqlite_database}" << EOQ
+sqlite3 "${SQLITE_DATABASE}" << EOQ
 DROP VIEW IF EXISTS fs_index_last;
 CREATE view fs_index_last
 AS
@@ -302,7 +325,7 @@ EOQ
 
 
 if [[ -n "${previous_scan_uuid}" ]]; then
-    sqlite3 "${sqlite_database}" << EOQ
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
 DROP VIEW IF EXISTS fs_checksum_diff_last;
 CREATE view fs_checksum_diff_last
 AS
@@ -327,17 +350,18 @@ else
 fi
 
 info "gzipping results"
-[[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
-gzip "${checksum_output_filename}"
-[[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}"
-
 [[ -f "${index_output_filename}.gz" ]] && rm -f "${index_output_filename}.gz"
 gzip "${index_output_filename}"
 [[ "$?" != "0" ]] && error "Error while gzipping index: ${index_output_filename}"
 
+[[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
+gzip "${checksum_output_filename}"
+[[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}"
+
+
 
 info "Filesystem index: '${index_output_filename}.gz'"
 info "Checksum index: '${checksum_output_filename}.gz'"
-info "Database: '${sqlite_database}'"
+info "Database: '${SQLITE_DATABASE}'"
 
 mutex_stop
