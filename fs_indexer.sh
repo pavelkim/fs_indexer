@@ -254,7 +254,7 @@ info "Created a temporary file: '${previous_scan_uuid_filename}'"
 sqlite3 "${SQLITE_DATABASE}" << EOQ > "${previous_scan_uuid_filename}"
 SELECT scan_uuid
 FROM fs_scan_history
-ORDER BY id ASC
+ORDER BY id DESC
 LIMIT 1;  
 EOQ
 
