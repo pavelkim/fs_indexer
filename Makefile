@@ -40,6 +40,10 @@ test:
 	bash fs_indexer.sh
 	ls -laR .
 
+	sqlite3 database.sqlite3 "select * from fs_scan_history"
+	sqlite3 database.sqlite3 "select * from fs_checksum"
+	sqlite3 database.sqlite3 "select * from fs_index"
+
 	@echo "noop"
 
 
