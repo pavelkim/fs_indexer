@@ -13,7 +13,7 @@ now=$( date "+%F %T" )
 hostname=$( hostname )
 scan_uuid=$( uuidgen )
 
-[[ -z "${WORKDIR}" ]] && GLOBAL_LOGLEVEL="${PWD}"
+[[ -z "${WORKDIR}" ]] && WORKDIR="${PWD}"
 
 output_dir="${WORKDIR}/${today}"
 if [[ ! -d "${output_dir}" ]]; then

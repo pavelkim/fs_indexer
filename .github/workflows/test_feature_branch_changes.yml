@@ -27,5 +27,8 @@ jobs:
       run: >-
         shellcheck fs_indexer.sh
 
+    - name: Build
+      run: make build
+
     - name: Run tests
       run: make test

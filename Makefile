@@ -7,6 +7,7 @@ TARGZ_CONTENTS = fs_indexer.sh README.md Makefile .version
 
 PREFIX = /opt/fs_indexer
 PWD = $(shell pwd)
+TMPDIR = $(shell mktemp -d)
 
 export PROGROOT=$(PWD)/$(PROGNAME_VERSION)
 
@@ -31,7 +32,20 @@ clean:
 	rm -vf "$(TARGZ_FILENAME)"
 
 test:
+	export SCAN_ROOT=${PWD}
+	cp $(PROGNAME_VERSION)/fs_indexer.sh $(TMPDIR)
+
+	cd $(TMPDIR)
+
+	bash fs_indexer.sh
+	ls -laR .
+
+	sqlite3 database.sqlite3 "select * from fs_scan_history"
+	sqlite3 database.sqlite3 "select * from fs_checksum"
+	sqlite3 database.sqlite3 "select * from fs_index"
+
 	@echo "noop"
+
 
 install:
 	install -d $(DESTDIR)/usr/share/doc/$(PROGNAME_VERSION)
