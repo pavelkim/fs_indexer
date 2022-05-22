@@ -65,5 +65,5 @@ jobs:
 
     - name: Pass if new version can't be created
       id: validate
-      if: steps.tag_exists.outputs.tag_exists != 'false'
+      if: steps.can_create.outputs.can_create != 'true'
       run: exit 1
