@@ -267,21 +267,21 @@ EOQ
 
 info "Creating views in the database"
 sqlite3 "${sqlite_database}" << EOQ
-DROP view fs_index_last;
+DROP VIEW IF EXISTS fs_index_last;
 CREATE view fs_index_last
 AS
   SELECT *
   FROM   fs_index
   WHERE  fs_index.scan_uuid = '${scan_uuid}';
 
-DROP view fs_checksum_last;
+DROP VIEW IF EXISTS fs_checksum_last;
 CREATE view fs_checksum_last
 AS
   SELECT *
   FROM   fs_checksum
   WHERE  fs_checksum.scan_uuid = '${scan_uuid}';
 
-DROP view fs_full_report_last;
+DROP VIEW IF EXISTS fs_full_report_last;
 CREATE view fs_full_report_last
 AS
   SELECT *
@@ -290,7 +290,7 @@ AS
   ON fs_index.name = fs_checksum.name
   WHERE  fs_index.scan_uuid = '${scan_uuid}';
 
-DROP view fs_full_report_last;
+DROP VIEW IF EXISTS fs_full_report_last;
 CREATE view fs_full_report_last
 AS
   SELECT *
@@ -303,7 +303,7 @@ EOQ
 
 if [[ -n "${previous_scan_uuid}" ]]; then
     sqlite3 "${sqlite_database}" << EOQ
-DROP view fs_checksum_diff_last;
+DROP VIEW IF EXISTS fs_checksum_diff_last;
 CREATE view fs_checksum_diff_last
 AS
   SELECT name
