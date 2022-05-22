@@ -13,7 +13,7 @@ now=$( date "+%F %T" )
 hostname=$( hostname )
 scan_uuid=$( uuidgen )
 
-[[ -z "${WORKDIR}" ]] && WORKDIR="${PWD}"
+[[ -z "${WORKDIR}" ]] && WORKDIR="$(pwd)"
 
 output_dir="${WORKDIR}/${today}"
 if [[ ! -d "${output_dir}" ]]; then
@@ -167,13 +167,13 @@ info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
 chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
-[[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: 'results/find_index_output.log'"
+[[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: '${checksum_output_logfile}'"
 info "Finished file indexing"
 
 info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
 chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
-[[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: 'results/find_checksum_output.log'"
+[[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: '${index_output_logfile}'"
 info "Finished checksum indexing"
 
 sed -e "s/^/${hostname}\t${scan_uuid}\t${now}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
