@@ -46,5 +46,5 @@ jobs:
     - name: Upload test results as artifact
       uses: actions/upload-artifact@v3
       with:
-        name: fs_indexer-${{ steps.planned_version.outputs.planned_version }}-test-results.tar.gz
-        path: /tmp/fs_indexer-${{ steps.planned_version.outputs.planned_version }}-test-results-${{ env.GITHUB_JOB }}.tar.gz
+        name: fs_indexer-${{ steps.planned_version.outputs.planned_version }}-test-results-${GITHUB_JOB}.tar.gz
+        path: /tmp/fs_indexer-${{ steps.planned_version.outputs.planned_version }}-test-results.tar.gz
