@@ -29,7 +29,6 @@ fi
 [[ -z "${SCAN_ROOT}" ]] && SCAN_ROOT="/"
 
 
-
 # TODO: Manage find_exceptions from config
 find_printf_format="${hostname}\t${scan_uuid}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
 find_exceptions=(
@@ -160,6 +159,7 @@ mutex_stop() {
 
 
 mutex_start
+
 scan_time_start=$( date "+%F %T" )
 
 info "Starting filesystem scan v${VERSION} (${scan_uuid})"
@@ -179,6 +179,9 @@ info "Finished checksum indexing"
 sed -e "s/^/${hostname}\t${scan_uuid}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
 
 scan_time_finish=$( date "+%F %T" )
+
+info "Scan start time: ${scan_time_start}"
+info "Scan finish time: ${scan_time_finish}"
 
 info "Loading collected data into SQLite database"
 
@@ -243,6 +246,22 @@ CREATE TABLE IF NOT EXISTS fs_scan_history (
 EOQ
 
 
+info "Get previous scan UUID from the database"
+
+previous_scan_uuid_filename=$( mktemp )
+info "Created a temporary file: '${previous_scan_uuid_filename}'"
+
+sqlite3 "${SQLITE_DATABASE}" << EOQ > "${previous_scan_uuid_filename}"
+SELECT scan_uuid
+FROM fs_scan_history
+ORDER BY id ASC
+LIMIT 1;  
+EOQ
+
+previous_scan_uuid=$(cat "${previous_scan_uuid_filename}")
+info "Previous scan UUID: ${previous_scan_uuid}"
+
+
 info "Registering scan in the scan history"
 sqlite3 "${SQLITE_DATABASE}" << EOQ
 INSERT INTO fs_scan_history (
@@ -269,20 +288,6 @@ sqlite3 "${SQLITE_DATABASE}" << EOQ
 .import ${checksum_output_filename}.tsv fs_checksum
 EOQ
 
-info "Get previous scan UUID from the database"
-
-previous_scan_uuid_filename=$( mktemp )
-info "Created a temporary file: '${previous_scan_uuid_filename}'"
-
-sqlite3 "${SQLITE_DATABASE}" << EOQ > "${previous_scan_uuid_filename}"
-SELECT scan_uuid
-FROM fs_scan_history
-ORDER BY id ASC
-LIMIT 1;  
-EOQ
-
-previous_scan_uuid=$(cat "${previous_scan_uuid_filename}")
-info "Previous scan UUID: ${previous_scan_uuid}"
 
 info "Fixing up data types in the database"
 sqlite3 "${SQLITE_DATABASE}" << EOQ
