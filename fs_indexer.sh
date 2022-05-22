@@ -274,8 +274,8 @@ INSERT INTO fs_scan_history (
   "${scan_uuid}",
   "${hostname}",
   "${VERSION}",
-  DATETIME"${scan_time_start}",
-  DATETIME"${scan_time_finish}"
+  DATETIME("${scan_time_start}"),
+  DATETIME("${scan_time_finish}")
 );
 EOQ
 
