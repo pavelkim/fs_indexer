@@ -8,8 +8,10 @@ TARGZ_CONTENTS = fs_indexer.sh README.md Makefile .version
 PREFIX = /opt/fs_indexer
 PWD = $(shell pwd)
 TMPDIR = $(shell mktemp -d)
+SCAN_ROOT=${PWD}
 
 export PROGROOT=$(PWD)/$(PROGNAME_VERSION)
+export SCAN_ROOT=${PWD}
 
 .PHONY: all version build clean install test
 
@@ -32,7 +34,6 @@ clean:
 	rm -vf "$(TARGZ_FILENAME)"
 
 test:
-	export SCAN_ROOT=${PWD}
 	cp -v "$(PROGNAME_VERSION)/fs_indexer.sh" "$(TMPDIR)"
 
 	cd "$(TMPDIR)"
