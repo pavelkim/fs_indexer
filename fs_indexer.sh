@@ -293,12 +293,9 @@ info "Fixing up data types in the database"
 sqlite3 "${SQLITE_DATABASE}" << EOQ
 .mode csv
 .header off
-UPDATE fs_checksum
-SET    scan_time = Datetime(scan_time);
 
 UPDATE fs_index
-SET scan_time = DATETIME(scan_time),
-    last_access_time = DATETIME(last_access_time),
+SET last_access_time = DATETIME(last_access_time),
     last_status_change_time = DATETIME(last_status_change_time),
     last_modification_time = DATETIME(last_modification_time)
 WHERE scan_uuid = '${scan_uuid}';
