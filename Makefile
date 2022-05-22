@@ -33,12 +33,13 @@ clean:
 
 test:
 	export SCAN_ROOT=${PWD}
-	@cp -v "$(PROGNAME_VERSION)/fs_indexer.sh" "$(TMPDIR)"
+	cp -v "$(PROGNAME_VERSION)/fs_indexer.sh" "$(TMPDIR)"
 
 	cd "$(TMPDIR)"
 	@echo "TMPDIR: $(TMPDIR)"
+	@echo "PWD: $(PWD)"
 
-	bash fs_indexer.sh
+	sudo bash fs_indexer.sh
 	ls -la .
 
 	sqlite3 database.sqlite3 "select * from fs_scan_history"

@@ -412,6 +412,7 @@ main() {
     scan_time_start=$( date "+%F %T" )
 
     info "Starting filesystem scan v${VERSION} (${scan_uuid})"
+    info "Scan root: '${SCAN_ROOT}'"
 
     index_files
     index_checksums
