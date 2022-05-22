@@ -34,12 +34,12 @@ fi
 # TODO: Manage find_exceptions from config
 find_printf_format="${hostname}\t${scan_uuid}\t${now}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
 find_exceptions=(
-    -not -path "${SCAN_ROOT%%*/}/dev/*" 
-    -not -path "${SCAN_ROOT%%*/}/proc/*" 
-    -not -path "${SCAN_ROOT%%*/}/run/*" 
-    -not -path "${SCAN_ROOT%%*/}/sys/*" 
-    -not -path "${SCAN_ROOT%%*/}/cgroup/*"
-    -not -path "${SCAN_ROOT%%*/}/swap"
+    -not -path "/dev/*" 
+    -not -path "/proc/*" 
+    -not -path "/run/*" 
+    -not -path "/sys/*" 
+    -not -path "/cgroup/*"
+    -not -path "/swap"
 )
 
 # TODO: Allow user to run more granular scans (more often than once per day)
@@ -166,13 +166,13 @@ info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 
 info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
-chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
+chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
 [[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: '${checksum_output_logfile}'"
 info "Finished file indexing"
 
 info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
-chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
+chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
 [[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: '${index_output_logfile}'"
 info "Finished checksum indexing"
 
