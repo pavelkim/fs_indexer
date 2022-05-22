@@ -75,6 +75,14 @@ jobs:
     name: Build, Test, Packages
     runs-on: ubuntu-latest
 
+    env:
+      PLANNED_VERSION: ${{ needs.validate_new_version.outputs.planned_version }}
+      TAG_HASH: ${{ needs.validate_new_version.outputs.tag_hash }}
+      CAN_CREATE_RELEASE: ${{ needs.validate_new_version.outputs.can_create }}
+      TAG_EXISTS: ${{ needs.validate_new_version.outputs.tag_exists }}
+      BRANCH_NAME: ${{ needs.validate_new_version.outputs.branch_name }}
+      APP_NAME: "fs_indexer"
+
     outputs:
       job_status: ${{ job.status }}
    
@@ -93,6 +101,18 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+
+      - name: Validate envionment variables
+        id: validate_envvars
+        shell: bash
+        run: |
+          [[ ! -z "PLANNED_VERSION" ]] || exit 2
+          [[ ! -z "TAG_HASH" ]] || exit 2
+          [[ ! -z "CAN_CREATE_RELEASE" ]] || exit 2
+          [[ ! -z "TAG_EXISTS" ]] || exit 2
+          [[ ! -z "BRANCH_NAME" ]] || exit 2
+
 
       - name: Build
         id: make_build
@@ -134,6 +154,62 @@ jobs:
 
       - name: Display changelog
         run: echo "${{ steps.generate_changelog.outputs.changelog }}"
+
+
+      - name: Define expected artifact name
+        id: artifact_meta
+        shell: bash
+        run: |
+          echo "::set-output name=filename::${APP_NAME}-${PLANNED_VERSION}.tar.gz"
+
+      - name: Build
+        run: >
+          make build compress
+
+      - name: Validate build artifact exists
+        id: validate_artifact_exists
+        shell: bash
+        run: |
+          ls -laht "${{ steps.artifact_meta.outputs.filename }}"
+
+      - name: Login to Docker registry
+        id: docker_registry_login
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Define version suffix
+        id: version_suffix
+        run: |
+          if [[ "${BRANCH_NAME}" == "master" ]]; then
+            short_suffix=""
+            long_suffix=""
+          else
+            short_suffix="${BRANCH_NAME:0:1}"
+            long_suffix="${BRANCH_NAME}"
+          fi
+
+
+          echo "::set-output name=short::${short_suffix}"
+          echo "::set-output name=long::${long_suffix}"
+
+
+      - name: Build Docker image
+        id: build_docker_image
+        shell: bash
+        run: >
+          GITHUB_IMAGE_ID=$(echo "${{ github.repository }}/${APP_NAME}${IMAGE_ID}" | tr '[A-Z]' '[a-z]')
+
+          docker build
+          --tag "ghcr.io/${GITHUB_IMAGE_ID}:${PLANNED_VERSION}${{ steps.version_suffix.outputs.long }}"
+          --build-arg BUILD_VERSION="${PLANNED_VERSION}"
+          --file Dockerfile
+          .
+
+      - name: Push Docker image to registry
+        run: |
+          GITHUB_IMAGE_ID=$(echo "${{ github.repository }}/${APP_NAME}${IMAGE_ID}" | tr '[A-Z]' '[a-z]')          
+          docker push "ghcr.io/${GITHUB_IMAGE_ID}:${PLANNED_VERSION}${{ steps.version_suffix.outputs.long }}"
+
 
       - name: Create a new tag
         if: >
