@@ -21,12 +21,12 @@ sqlite_database="database.sqlite3"
 
 find_printf_format="${hostname}\t${scan_uuid}\t${now}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
 find_exceptions=(
-    -not -path "/dev/*" 
-    -not -path "/proc/*" 
-    -not -path "/run/*" 
-    -not -path "/sys/*" 
-    -not -path "/cgroup/*"
-    -not -path "/swap"
+    -not -path "${SCAN_ROOT}/dev/*" 
+    -not -path "${SCAN_ROOT}/proc/*" 
+    -not -path "${SCAN_ROOT}/run/*" 
+    -not -path "${SCAN_ROOT}/sys/*" 
+    -not -path "${SCAN_ROOT}/cgroup/*"
+    -not -path "${SCAN_ROOT}/swap"
 )
 
 # du_exclude=(
