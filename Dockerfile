@@ -16,6 +16,6 @@ RUN apk add bash
 ENV SCAN_ROOT="/scan"
 
 WORKDIR /
-COPY --from builder "/src/${PROGNAME}-${BUILD_VERSION}/fs_indexer.sh" fs_indexer.sh
+COPY --from=builder "/src/${PROGNAME}-${BUILD_VERSION}/fs_indexer.sh" fs_indexer.sh
 
 ENTRYPOINT ["./fs_indexer.sh"]

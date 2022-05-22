@@ -1,4 +1,4 @@
-name: Test new changes in a feature branch
+name: Test new changes in feature branch
 
 on:
   push:

@@ -5,3 +5,6 @@ results/*
 *.db
 *.sqlite3
 *.tmp
+
+*.gz
+*.tar.gz
