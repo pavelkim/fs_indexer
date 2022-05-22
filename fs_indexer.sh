@@ -326,7 +326,7 @@ else
     info "First scan. Not creating comparison view."
 fi
 
-info "GZipping results"
+info "gzipping results"
 [[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
 gzip "${checksum_output_filename}"
 [[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}"
@@ -338,6 +338,6 @@ gzip "${index_output_filename}"
 
 info "Filesystem index: '${index_output_filename}.gz'"
 info "Checksum index: '${checksum_output_filename}.gz'"
-
+info "Database: '${sqlite_database}'"
 
 mutex_stop
