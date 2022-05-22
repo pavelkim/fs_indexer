@@ -11,7 +11,7 @@ RUN make build
 
 
 FROM alpine:3.15
-RUN apk add bash findutils uuidgen
+RUN apk add bash findutils uuidgen sqlite3
 
 ARG BUILD_VERSION=0.0.0
 ARG PROGNAME=fs_indexer
