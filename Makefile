@@ -7,6 +7,7 @@ TARGZ_CONTENTS = fs_indexer.sh README.md Makefile .version
 
 PREFIX = /opt/fs_indexer
 PWD = $(shell pwd)
+TMPDIR = $(shell mktemp -d)
 
 export PROGROOT=$(PWD)/$(PROGNAME_VERSION)
 
@@ -31,12 +32,12 @@ clean:
 	rm -vf "$(TARGZ_FILENAME)"
 
 test:
-	TMPDIR = $(shell mktemp -d)
 	export SCAN_ROOT=${PWD}
+	cp $(PROGNAME_VERSION)/fs_indexer.sh $(TMPDIR)
 
-	cd $(TMPDIR)	
+	cd $(TMPDIR)
 
-	$(PROGNAME_VERSION)/fs_indexer.sh
+	bash fs_indexer.sh
 	ls -laR .
 
 	@echo "noop"
