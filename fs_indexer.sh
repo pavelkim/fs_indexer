@@ -29,13 +29,6 @@ find_exceptions=(
     -not -path "${SCAN_ROOT}/swap"
 )
 
-# du_exclude=(
-#     --exclude /proc
-#     --exclude /dev
-#     --exclude /sys
-#     --exclude /run
-# )
-
 output_dir="results/${today}"
 if [[ ! -d "${output_dir}" ]]; then
     mkdir -p "${output_dir}"
@@ -43,9 +36,6 @@ fi
 
 checksum_output_filename="${output_dir}/checksum_${hostname}_${today}.lst"
 index_output_filename="${output_dir}/index_${hostname}_${today}.lst"
-# sizes_dir_output_filename="${output_dir}/sizes_dir_${hostname}_${today}.lst"
-# sizes_dir_file_output_filename="${output_dir}/sizes_dir_file_${hostname}_${today}.lst"
-
 
 timestamp() {
     date "+%F %T"
@@ -151,27 +141,15 @@ mutex_start
 
 info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 
-# info "Starting dir size indexing"
-# info "Indexing output file: ${sizes_dir_output_filename}"
-# du "${du_exclude[@]}" -S / > "${sizes_dir_output_filename}"
-# [[ "$?" != "0" ]] && error "Error while indexind dirs."
-# info "Finished dir size indexing"
-
-# info "Starting dir and file size indexing"
-# info "Indexing output file: ${sizes_dir_file_output_filename}"
-# du "${du_exclude[@]}" -a / > "${sizes_dir_file_output_filename}"
-# [[ "$?" != "0" ]] && error "Error while indexing dirs and files."
-# info "Finished dir and file size indexing"
-
 info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
-find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>results/find_index_output.log
+chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>results/find_index_output.log
 [[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: 'results/find_index_output.log'"
 info "Finished file indexing"
 
 info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
-find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>results/find_checksum_output.log
+chroot "${SCAN_ROOT}" find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>results/find_checksum_output.log
 [[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: 'results/find_checksum_output.log'"
 info "Finished checksum indexing"
 
@@ -320,7 +298,11 @@ AS
   JOIN fs_checksum
   ON fs_index.name = fs_checksum.name
   WHERE  fs_index.scan_uuid = '${scan_uuid}';
+EOQ
 
+
+if [[ -n "${previous_scan_uuid}" ]]; then
+    sqlite3 "${sqlite_database}" << EOQ
 DROP view fs_checksum_diff_last;
 CREATE view fs_checksum_diff_last
 AS
@@ -340,6 +322,9 @@ AS
   GROUP  BY name;  
 EOQ
 
+else
+    info "First scan. Not creating comparison view."
+fi
 
 info "GZipping results"
 [[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
@@ -350,18 +335,9 @@ gzip "${checksum_output_filename}"
 gzip "${index_output_filename}"
 [[ "$?" != "0" ]] && error "Error while gzipping index: ${index_output_filename}"
 
-# [[ -f "${sizes_dir_output_filename}.gz" ]] && rm -f "${sizes_dir_output_filename}.gz"
-# gzip "${sizes_dir_output_filename}"
-# [[ "$?" != "0" ]] && error "Error while gzipping sizes: ${sizes_dir_output_filename}"
-
-# [[ -f "${sizes_dir_file_output_filename}.gz" ]] && rm -f "${sizes_dir_file_output_filename}.gz"
-# gzip "${sizes_dir_file_output_filename}"
-# [[ "$?" != "0" ]] && error "Error while gzipping sizes: ${sizes_dir_file_output_filename}"
-
 
 info "Filesystem index: '${index_output_filename}.gz'"
 info "Checksum index: '${checksum_output_filename}.gz'"
-# info "Full sizes index: '${sizes_dir_file_output_filename}.gz'"
-# info "Directory sizes index: '${sizes_dir_output_filename}.gz'"
+
 
 mutex_stop
