@@ -17,6 +17,8 @@ sqlite_database="database.sqlite3"
 [[ -z "${GLOBAL_LOGLEVEL}" ]] && GLOBAL_LOGLEVEL="4"
 [[ -z "${MUTEX_FILE}" ]] && MUTEX_FILE="$0.lock"
 
+[[ -z "${SCAN_ROOT}" ]] && SCAN_ROOT="/"
+
 find_printf_format="${hostname}\t${scan_uuid}\t${now}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
 find_exceptions=(
     -not -path "/dev/*" 
@@ -24,6 +26,7 @@ find_exceptions=(
     -not -path "/run/*" 
     -not -path "/sys/*" 
     -not -path "/cgroup/*"
+    -not -path "/swap"
 )
 
 # du_exclude=(
@@ -40,8 +43,8 @@ fi
 
 checksum_output_filename="${output_dir}/checksum_${hostname}_${today}.lst"
 index_output_filename="${output_dir}/index_${hostname}_${today}.lst"
-sizes_dir_output_filename="${output_dir}/sizes_dir_${hostname}_${today}.lst"
-sizes_dir_file_output_filename="${output_dir}/sizes_dir_file_${hostname}_${today}.lst"
+# sizes_dir_output_filename="${output_dir}/sizes_dir_${hostname}_${today}.lst"
+# sizes_dir_file_output_filename="${output_dir}/sizes_dir_file_${hostname}_${today}.lst"
 
 
 timestamp() {
@@ -151,13 +154,13 @@ info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 
 info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
-find / "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}"
+find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}"
 [[ "$?" != "0" ]] && error "Error while finding files."
 info "Finished file indexing"
 
 info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
-find / "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}"
+find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}"
 [[ "$?" != "0" ]] && error "Error while finding files."
 info "Finished checksum indexing"
 
@@ -168,68 +171,69 @@ info "Loading collected data into SQLite database"
 
 info "Initialising schema for fs_index table"
 sqlite3 "${sqlite_database}" << EOQ
-create table if not exists fs_index (
-  hostname                   TEXT,
-  scan_uuid                  TEXT,
-  scan_time                  DATETIME,
-  last_access_time           DATETIME,
-  last_status_change_time    DATETIME,
-  last_modification_time     DATETIME,
-  depth_in_tree              INTEGER,
-  basename                   TEXT,
-  parent_directory           TEXT,
-  group_name                 TEXT,
-  group_id                   INTEGER,
-  user_name                  TEXT,
-  user_id                    INTEGER,
-  inode_number               INTEGER,
-  symlink_target             TEXT,
-  hardlinks_count            INTEGER,
-  permissions_num            TEXT,
-  name                       TEXT,
-  size_bytes                 INTEGER,
-  type                       TEXT
+CREATE TABLE IF NOT EXISTS fs_index (
+     hostname                TEXT,
+     scan_uuid               TEXT,
+     scan_time               DATETIME,
+     last_access_time        DATETIME,
+     last_status_change_time DATETIME,
+     last_modification_time  DATETIME,
+     depth_in_tree           INTEGER,
+     basename                TEXT,
+     parent_directory        TEXT,
+     group_name              TEXT,
+     group_id                INTEGER,
+     user_name               TEXT,
+     user_id                 INTEGER,
+     inode_number            INTEGER,
+     symlink_target          TEXT,
+     hardlinks_count         INTEGER,
+     permissions_num         TEXT,
+     name                    TEXT,
+     size_bytes              INTEGER,
+     type                    TEXT
 );
 
-CREATE INDEX idx_fs_index_name on fs_index (name);
-CREATE INDEX idx_fs_index_scan_uuid on fs_index (scan_uuid);
-CREATE INDEX idx_fs_index_last_modification_time on fs_index (last_modification_time);
+CREATE INDEX IF NOT EXISTS idx_fs_index_scan_uuid ON fs_index (scan_uuid);
+# CREATE INDEX IF NOT EXISTS idx_fs_index_name ON fs_index (name);
+# CREATE INDEX IF NOT EXISTS idx_fs_index_last_modification_time ON fs_index (last_modification_time);
 EOQ
 
 
 info "Initialising schema for fs_checksum table"
 sqlite3 "${sqlite_database}" << EOQ
-create table if not exists fs_checksum (
-  hostname                  TEXT,
-  scan_uuid                 TEXT,
-  scan_time                 DATETIME,
-  checksum_type             TEXT,
-  checksum                  TEXT,
-  name                      TEXT
+CREATE TABLE IF NOT EXISTS fs_checksum (
+     hostname      TEXT,
+     scan_uuid     TEXT,
+     scan_time     DATETIME,
+     checksum_type TEXT,
+     checksum      TEXT,
+     name          TEXT
 );
 
-CREATE INDEX idx_fs_checksum_name on fs_checksum (name);
-CREATE INDEX idx_fs_checksum_scan_uuid on fs_checksum (scan_uuid);
-CREATE INDEX idx_fs_checksum_checksum on fs_checksum (checksum);
-CREATE INDEX idx_fs_checksum_checksum_name on fs_checksum (checksum, name);
+CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid_name ON fs_checksum (scan_uuid, name);
+CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum_name ON fs_checksum (checksum, name);
+CREATE INDEX IF NOT EXISTS idx_fs_checksum_name ON fs_checksum (name);
+# CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid ON fs_checksum (scan_uuid);
+# CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum ON fs_checksum (checksum);
 EOQ
 
 
 info "Initialising schema for fs_scan_history table"
 sqlite3 "${sqlite_database}" << EOQ
-create table if not exists fs_scan_history (
-  id                     INTEGER PRIMARY KEY AUTOINCREMENT,
-  scan_uuid              TEXT,
-  scan_time              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  VERSION                TEXT,
-  hostname               TEXT
-);
+CREATE TABLE IF NOT EXISTS fs_scan_history (
+     id INTEGER PRIMARY KEY autoincrement,
+     scan_uuid text,
+     scan_time timestamp DEFAULT CURRENT_TIMESTAMP,
+     version text,
+     hostname text
+); 
 EOQ
 
 
 info "Registering scan in the scan history"
 sqlite3 "${sqlite_database}" << EOQ
-insert into fs_scan_history (scan_uuid, hostname, VERSION) values ("${scan_uuid}", "${hostname}", "${VERSION}");
+INSERT INTO fs_scan_history (scan_uuid, hostname, version) VALUES ("${scan_uuid}", "${hostname}", "${VERSION}");
 EOQ
 
 
@@ -247,10 +251,10 @@ previous_scan_uuid_filename=$( mktemp )
 info "Created a temporary file: '${previous_scan_uuid_filename}'"
 
 sqlite3 "${sqlite_database}" << EOQ > "${previous_scan_uuid_filename}"
-select scan_uuid
-from fs_scan_history
-order by id desc
-limit 1;
+SELECT scan_uuid
+FROM fs_scan_history
+ORDER BY id ASC
+LIMIT 1;  
 EOQ
 
 previous_scan_uuid=$(cat "${previous_scan_uuid_filename}")
@@ -260,66 +264,88 @@ info "Fixing up data types in the database"
 sqlite3 "${sqlite_database}" << EOQ
 .mode csv
 .header off
-update fs_checksum set scan_time = DATETIME(scan_time);
-update fs_index set scan_time = DATETIME(scan_time), 
- last_access_time = DATETIME(last_access_time), 
- last_status_change_time = DATETIME(last_status_change_time), 
- last_modification_time = DATETIME(last_modification_time);
+UPDATE fs_checksum
+SET    scan_time = Datetime(scan_time);
+
+UPDATE fs_index
+SET scan_time = DATETIME(scan_time),
+    last_access_time = DATETIME(last_access_time),
+    last_status_change_time = DATETIME(last_status_change_time),
+    last_modification_time = DATETIME(last_modification_time)
+WHERE scan_uuid = '${scan_uuid}';
 EOQ
 
 
 info "Creating views in the database"
 sqlite3 "${sqlite_database}" << EOQ
-create view fs_index_last as
-  select * 
-  from fs_index
-  where fs_index.scan_uuid = '${scan_uuid}';
+DROP view fs_index_last;
+CREATE view fs_index_last
+AS
+  SELECT *
+  FROM   fs_index
+  WHERE  fs_index.scan_uuid = '${scan_uuid}';
 
-create view fs_checksum_last as
-  select * 
-  from fs_checksum
-  where fs_checksum.scan_uuid = '${scan_uuid}';
+DROP view fs_checksum_last;
+CREATE view fs_checksum_last
+AS
+  SELECT *
+  FROM   fs_checksum
+  WHERE  fs_checksum.scan_uuid = '${scan_uuid}';
 
-create view fs_full_report_last as
-  select * 
-  from fs_index join fs_checksum
-  on fs_index.name = fs_checksum.name
-  where fs_index.scan_uuid = '${scan_uuid}';
+DROP view fs_full_report_last;
+CREATE view fs_full_report_last
+AS
+  SELECT *
+  FROM   fs_index
+  JOIN fs_checksum
+  ON fs_index.name = fs_checksum.name
+  WHERE  fs_index.scan_uuid = '${scan_uuid}';
 
-create view fs_full_report_last as
-  select * 
-  from fs_index join fs_checksum
-  on fs_index.name = fs_checksum.name
-  where fs_index.scan_uuid = '${scan_uuid}';
+DROP view fs_full_report_last;
+CREATE view fs_full_report_last
+AS
+  SELECT *
+  FROM fs_index
+  JOIN fs_checksum
+  ON fs_index.name = fs_checksum.name
+  WHERE  fs_index.scan_uuid = '${scan_uuid}';
 
-create view fs_checksum_diff_last as
-  select name from (
-    select scan_uuid, name, checksum, count(name) as count 
-    from fs_checksum 
-    group by checksum, name 
-    order by count, name asc
-  )
-  where count = 1
-  group by name ;
+DROP view fs_checksum_diff_last;
+CREATE view fs_checksum_diff_last
+AS
+  SELECT name
+  FROM   (SELECT scan_uuid,
+                 name,
+                 checksum,
+                 COUNT(name) AS count
+          FROM fs_checksum
+          WHERE scan_uuid IN (
+            '${previous_scan_uuid}',
+            '${scan_uuid}'
+          )
+          GROUP  BY checksum, name
+          ORDER  BY count, name ASC)
+  WHERE  count = 1
+  GROUP  BY name;  
 EOQ
 
 
-# info "GZipping results"
-# [[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
-# gzip "${checksum_output_filename}"
-# [[ "$?" != "0" ]] && error "Error while gzipping index."
+info "GZipping results"
+[[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
+gzip "${checksum_output_filename}"
+[[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}"
 
-# [[ -f "${index_output_filename}.gz" ]] && rm -f "${index_output_filename}.gz"
-# gzip "${index_output_filename}"
-# [[ "$?" != "0" ]] && error "Error while gzipping sizes."
+[[ -f "${index_output_filename}.gz" ]] && rm -f "${index_output_filename}.gz"
+gzip "${index_output_filename}"
+[[ "$?" != "0" ]] && error "Error while gzipping index: ${index_output_filename}"
 
-[[ -f "${sizes_dir_output_filename}.gz" ]] && rm -f "${sizes_dir_output_filename}.gz"
-gzip "${sizes_dir_output_filename}"
-[[ "$?" != "0" ]] && error "Error while gzipping sizes."
+# [[ -f "${sizes_dir_output_filename}.gz" ]] && rm -f "${sizes_dir_output_filename}.gz"
+# gzip "${sizes_dir_output_filename}"
+# [[ "$?" != "0" ]] && error "Error while gzipping sizes: ${sizes_dir_output_filename}"
 
-[[ -f "${sizes_dir_file_output_filename}.gz" ]] && rm -f "${sizes_dir_file_output_filename}.gz"
-gzip "${sizes_dir_file_output_filename}"
-[[ "$?" != "0" ]] && error "Error while gzipping sizes."
+# [[ -f "${sizes_dir_file_output_filename}.gz" ]] && rm -f "${sizes_dir_file_output_filename}.gz"
+# gzip "${sizes_dir_file_output_filename}"
+# [[ "$?" != "0" ]] && error "Error while gzipping sizes: ${sizes_dir_file_output_filename}"
 
 
 info "Filesystem index: '${index_output_filename}.gz'"

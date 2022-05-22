@@ -1,4 +1,4 @@
-name: Test new changes
+name: Test new changes in a feature branch
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 jobs:
 
   test_new_changes:
-    name: Run tests and checks
+    name: Run tests and checks on a feature branch
     runs-on: ubuntu-latest
     outputs:
       job_status: ${{ job.status }}
