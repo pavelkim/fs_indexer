@@ -21,12 +21,12 @@ sqlite_database="database.sqlite3"
 
 find_printf_format="${hostname}\t${scan_uuid}\t${now}\t%AY-%Am-%Ad %AT\t%CY-%Cm-%Cd %CT\t%TY-%Tm-%Td %TT\t%d\t%f\t%h\t%g\t%G\t%u\t%U\t%i\t%l\t%n\t%#m\t%p\t%s\t%y\n"
 find_exceptions=(
-    -not -path "${SCAN_ROOT}/dev/*" 
-    -not -path "${SCAN_ROOT}/proc/*" 
-    -not -path "${SCAN_ROOT}/run/*" 
-    -not -path "${SCAN_ROOT}/sys/*" 
-    -not -path "${SCAN_ROOT}/cgroup/*"
-    -not -path "${SCAN_ROOT}/swap"
+    -not -path "${SCAN_ROOT%%*/}/dev/*" 
+    -not -path "${SCAN_ROOT%%*/}/proc/*" 
+    -not -path "${SCAN_ROOT%%*/}/run/*" 
+    -not -path "${SCAN_ROOT%%*/}/sys/*" 
+    -not -path "${SCAN_ROOT%%*/}/cgroup/*"
+    -not -path "${SCAN_ROOT%%*/}/swap"
 )
 
 output_dir="results/${today}"
@@ -184,8 +184,8 @@ CREATE TABLE IF NOT EXISTS fs_index (
 );
 
 CREATE INDEX IF NOT EXISTS idx_fs_index_scan_uuid ON fs_index (scan_uuid);
-# CREATE INDEX IF NOT EXISTS idx_fs_index_name ON fs_index (name);
-# CREATE INDEX IF NOT EXISTS idx_fs_index_last_modification_time ON fs_index (last_modification_time);
+-- CREATE INDEX IF NOT EXISTS idx_fs_index_name ON fs_index (name);
+-- CREATE INDEX IF NOT EXISTS idx_fs_index_last_modification_time ON fs_index (last_modification_time);
 EOQ
 
 
@@ -203,8 +203,8 @@ CREATE TABLE IF NOT EXISTS fs_checksum (
 CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid_name ON fs_checksum (scan_uuid, name);
 CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum_name ON fs_checksum (checksum, name);
 CREATE INDEX IF NOT EXISTS idx_fs_checksum_name ON fs_checksum (name);
-# CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid ON fs_checksum (scan_uuid);
-# CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum ON fs_checksum (checksum);
+-- CREATE INDEX IF NOT EXISTS idx_fs_checksum_scan_uuid ON fs_checksum (scan_uuid);
+-- CREATE INDEX IF NOT EXISTS idx_fs_checksum_checksum ON fs_checksum (checksum);
 EOQ
 
 
@@ -267,21 +267,21 @@ EOQ
 
 info "Creating views in the database"
 sqlite3 "${sqlite_database}" << EOQ
-DROP view fs_index_last;
+DROP VIEW IF EXISTS fs_index_last;
 CREATE view fs_index_last
 AS
   SELECT *
   FROM   fs_index
   WHERE  fs_index.scan_uuid = '${scan_uuid}';
 
-DROP view fs_checksum_last;
+DROP VIEW IF EXISTS fs_checksum_last;
 CREATE view fs_checksum_last
 AS
   SELECT *
   FROM   fs_checksum
   WHERE  fs_checksum.scan_uuid = '${scan_uuid}';
 
-DROP view fs_full_report_last;
+DROP VIEW IF EXISTS fs_full_report_last;
 CREATE view fs_full_report_last
 AS
   SELECT *
@@ -290,7 +290,7 @@ AS
   ON fs_index.name = fs_checksum.name
   WHERE  fs_index.scan_uuid = '${scan_uuid}';
 
-DROP view fs_full_report_last;
+DROP VIEW IF EXISTS fs_full_report_last;
 CREATE view fs_full_report_last
 AS
   SELECT *
@@ -303,7 +303,7 @@ EOQ
 
 if [[ -n "${previous_scan_uuid}" ]]; then
     sqlite3 "${sqlite_database}" << EOQ
-DROP view fs_checksum_diff_last;
+DROP VIEW IF EXISTS fs_checksum_diff_last;
 CREATE view fs_checksum_diff_last
 AS
   SELECT name
@@ -326,7 +326,7 @@ else
     info "First scan. Not creating comparison view."
 fi
 
-info "GZipping results"
+info "gzipping results"
 [[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
 gzip "${checksum_output_filename}"
 [[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}"
@@ -338,6 +338,6 @@ gzip "${index_output_filename}"
 
 info "Filesystem index: '${index_output_filename}.gz'"
 info "Checksum index: '${checksum_output_filename}.gz'"
-
+info "Database: '${sqlite_database}'"
 
 mutex_stop
