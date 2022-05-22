@@ -31,7 +31,16 @@ clean:
 	rm -vf "$(TARGZ_FILENAME)"
 
 test:
+	TMPDIR = $(shell mktemp -d)
+	export SCAN_ROOT=${PWD}
+
+	cd $(TMPDIR)	
+
+	$(PROGNAME_VERSION)/fs_indexer.sh
+	ls -laR .
+
 	@echo "noop"
+
 
 install:
 	install -d $(DESTDIR)/usr/share/doc/$(PROGNAME_VERSION)
