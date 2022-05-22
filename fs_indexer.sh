@@ -63,6 +63,17 @@ error() {
         exit "${rc}"
 }
 
+warning() {
+
+    local msg="$1"
+    local self_level=2
+    local self_level_name="warning"
+
+    if [[ "${self_level}" -le "${GLOBAL_LOGLEVEL}" ]]; then 
+        echo "[$(timestamp)] [${self_level_name}] [${FUNCNAME[1]}] ${msg}" >&2
+        return 0
+    fi
+}
 info() {
 
     local msg="$1"
@@ -155,13 +166,13 @@ info "Starting filesystem scan v${VERSION} (${scan_uuid})"
 info "Starting file indexing"
 info "Indexing output file: ${index_output_filename}"
 find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>results/find_index_output.log
-[[ "$?" != "0" ]] && error "Error while finding files."
+[[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: 'results/find_index_output.log'"
 info "Finished file indexing"
 
 info "Starting checksum indexing"
 info "Indexing output file: ${checksum_output_filename}"
 find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>results/find_checksum_output.log
-[[ "$?" != "0" ]] && error "Error while finding files."
+[[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: 'results/find_checksum_output.log'"
 info "Finished checksum indexing"
 
 sed -e "s/^/${hostname}\t${scan_uuid}\t${now}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
