@@ -40,14 +40,15 @@ test:
 	@echo "PWD: $(PWD)"
 	@echo "PWD: ${PWD}"
 
-	bash fs_indexer.sh
+	SCAN_ROOT=${PWD} bash fs_indexer.sh
 	ls -la .
 
 	sqlite3 database.sqlite3 "select * from fs_scan_history"
 	sqlite3 database.sqlite3 "select * from fs_checksum"
 	sqlite3 database.sqlite3 "select * from fs_index"
 
-	tar -zcf /tmp/$(PROGNAME_VERSION)-test-results.tar.gz "${SCAN_ROOT}"
+	tar -zcf "/tmp/$(PROGNAME_VERSION)-test-results.tar.gz" "${SCAN_ROOT}"
+	ls -la "/tmp/$(PROGNAME_VERSION)-test-results.tar.gz"
 
 	@echo "noop"
 
