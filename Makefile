@@ -41,7 +41,7 @@ test:
 	@echo "PWD: $(PWD)"
 	@echo "PWD: ${PWD}"
 
-	SCAN_ROOT=${PWD} sudo bash fs_indexer.sh
+	sudo SCAN_ROOT="${PWD}" bash fs_indexer.sh
 	ls -la .
 
 	sqlite3 database.sqlite3 "select * from fs_scan_history"
