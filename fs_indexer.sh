@@ -157,36 +157,35 @@ mutex_stop() {
     remove_mutex
 }
 
+index_files() {
 
-mutex_start
+    info "Starting file indexing"
+    info "Indexing output file: ${index_output_filename}"
+    
+    chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
+    [[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: '${checksum_output_logfile}'"
+    info "Finished file indexing"
 
-scan_time_start=$( date "+%F %T" )
+}
 
-info "Starting filesystem scan v${VERSION} (${scan_uuid})"
+index_checksums() {
 
-info "Starting file indexing"
-info "Indexing output file: ${index_output_filename}"
-chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
-[[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: '${checksum_output_logfile}'"
-info "Finished file indexing"
+    info "Starting checksum indexing"
+    info "Indexing output file: ${checksum_output_filename}"
 
-info "Starting checksum indexing"
-info "Indexing output file: ${checksum_output_filename}"
-chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
-[[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: '${index_output_logfile}'"
-info "Finished checksum indexing"
+    chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
+    [[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: '${index_output_logfile}'"
+    info "Finished checksum indexing"
 
-sed -e "s/^/${hostname}\t${scan_uuid}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
+    info "Supplying extra information"
+    sed -e "s/^/${hostname}\t${scan_uuid}\tmd5\t/" -e "s/ \+ /\t/g" "${checksum_output_filename}" > "${checksum_output_filename}.tsv"
 
-scan_time_finish=$( date "+%F %T" )
+}
 
-info "Scan start time: ${scan_time_start}"
-info "Scan finish time: ${scan_time_finish}"
+init_db() {
 
-info "Loading collected data into SQLite database"
-
-info "Initialising schema for fs_index table"
-sqlite3 "${SQLITE_DATABASE}" << EOQ
+    info "Initialising schema for fs_index table"
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_index (
      hostname                TEXT,
      scan_uuid               TEXT,
@@ -214,9 +213,8 @@ CREATE INDEX IF NOT EXISTS idx_fs_index_scan_uuid ON fs_index (scan_uuid);
 -- CREATE INDEX IF NOT EXISTS idx_fs_index_last_modification_time ON fs_index (last_modification_time);
 EOQ
 
-
-info "Initialising schema for fs_checksum table"
-sqlite3 "${SQLITE_DATABASE}" << EOQ
+    info "Initialising schema for fs_checksum table"
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_checksum (
      hostname      TEXT,
      scan_uuid     TEXT,
@@ -233,8 +231,8 @@ CREATE INDEX IF NOT EXISTS idx_fs_checksum_name ON fs_checksum (name);
 EOQ
 
 
-info "Initialising schema for fs_scan_history table"
-sqlite3 "${SQLITE_DATABASE}" << EOQ
+    info "Initialising schema for fs_scan_history table"
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
 CREATE TABLE IF NOT EXISTS fs_scan_history (
      id INTEGER PRIMARY KEY autoincrement,
      scan_uuid        text,
@@ -244,44 +242,12 @@ CREATE TABLE IF NOT EXISTS fs_scan_history (
      hostname         text
 );
 EOQ
+}
 
+import_results_to_db() {
 
-info "Get previous scan UUID from the database"
-
-previous_scan_uuid_filename=$( mktemp )
-info "Created a temporary file: '${previous_scan_uuid_filename}'"
-
-sqlite3 "${SQLITE_DATABASE}" << EOQ > "${previous_scan_uuid_filename}"
-SELECT scan_uuid
-FROM fs_scan_history
-ORDER BY id DESC
-LIMIT 1;  
-EOQ
-
-previous_scan_uuid=$(cat "${previous_scan_uuid_filename}")
-info "Previous scan UUID: ${previous_scan_uuid}"
-
-
-info "Registering scan in the scan history"
-sqlite3 "${SQLITE_DATABASE}" << EOQ
-INSERT INTO fs_scan_history (
-  scan_uuid,
-  hostname,
-  version,
-  scan_time_start,
-  scan_time_finish
-) VALUES (
-  "${scan_uuid}",
-  "${hostname}",
-  "${VERSION}",
-  DATETIME("${scan_time_start}"),
-  DATETIME("${scan_time_finish}")
-);
-EOQ
-
-
-info "Importing collected data into the database"
-sqlite3 "${SQLITE_DATABASE}" << EOQ
+    info "Importing collected data into the database"
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
 .mode csv
 .separator \t
 .import ${index_output_filename} fs_index
@@ -289,8 +255,8 @@ sqlite3 "${SQLITE_DATABASE}" << EOQ
 EOQ
 
 
-info "Fixing up data types in the database"
-sqlite3 "${SQLITE_DATABASE}" << EOQ
+    info "Fixing up data types in the database"
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
 .mode csv
 .header off
 
@@ -301,9 +267,13 @@ SET last_access_time = DATETIME(last_access_time),
 WHERE scan_uuid = '${scan_uuid}';
 EOQ
 
+}
 
-info "Creating views in the database"
-sqlite3 "${SQLITE_DATABASE}" << EOQ
+create_views_in_db() {
+
+    info "Creating views in the database"
+
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
 DROP VIEW IF EXISTS fs_index_last;
 CREATE view fs_index_last
 AS
@@ -322,24 +292,36 @@ DROP VIEW IF EXISTS fs_full_report_last;
 CREATE view fs_full_report_last
 AS
   SELECT *
-  FROM   fs_index
-  JOIN fs_checksum
-  ON fs_index.name = fs_checksum.name
-  WHERE  fs_index.scan_uuid = '${scan_uuid}';
-
-DROP VIEW IF EXISTS fs_full_report_last;
-CREATE view fs_full_report_last
-AS
-  SELECT *
   FROM fs_index
   JOIN fs_checksum
   ON fs_index.name = fs_checksum.name
   WHERE  fs_index.scan_uuid = '${scan_uuid}';
+
+
+DROP VIEW IF EXISTS fs_scan_history_extended;
+CREATE view fs_scan_history_extended
+AS
+  SELECT id,
+    scan_uuid,
+    scan_time_start,
+    scan_time_finish,
+    version,
+    hostname,
+    CAST(
+        (JulianDay(scan_time_finish) - JulianDay(scan_time_start)) * 24 * 60 * 60
+    AS Integer) as duration_seconds,
+    CAST(
+        (JulianDay(scan_time_finish) - JulianDay(scan_time_start)) * 24 * 60
+    AS Integer) as duration_minutes,
+    CAST(
+        (JulianDay(scan_time_finish) - JulianDay(scan_time_start)) * 24
+    AS Integer) as duration_hours
+  FROM fs_scan_history;
 EOQ
 
 
-if [[ -n "${previous_scan_uuid}" ]]; then
-    sqlite3 "${SQLITE_DATABASE}" << EOQ
+    if [[ -n "${previous_scan_uuid}" ]]; then
+        sqlite3 "${SQLITE_DATABASE}" << EOQ
 DROP VIEW IF EXISTS fs_checksum_diff_last;
 CREATE view fs_checksum_diff_last
 AS
@@ -356,26 +338,108 @@ AS
           GROUP  BY checksum, name
           ORDER  BY count, name ASC)
   WHERE  count = 1
-  GROUP  BY name;  
+  GROUP  BY name;
 EOQ
 
-else
-    info "First scan. Not creating comparison view."
-fi
+    else
+        warning "First scan. Not creating comparison view."
+    fi
 
-info "gzipping results"
-[[ -f "${index_output_filename}.gz" ]] && rm -f "${index_output_filename}.gz"
-gzip "${index_output_filename}"
-[[ "$?" != "0" ]] && error "Error while gzipping index: ${index_output_filename}"
+}
 
-[[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
-gzip "${checksum_output_filename}"
-[[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}"
+compress_results() {
 
+    info "gzipping results"
+    [[ -f "${index_output_filename}.gz" ]] && rm -f "${index_output_filename}.gz"
+    gzip "${index_output_filename}"
+    [[ "$?" != "0" ]] && error "Error while gzipping index: ${index_output_filename}"
 
+    [[ -f "${checksum_output_filename}.gz" ]] && rm -f "${checksum_output_filename}.gz"
+    gzip "${checksum_output_filename}"
+    [[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}"
 
-info "Filesystem index: '${index_output_filename}.gz'"
-info "Checksum index: '${checksum_output_filename}.gz'"
-info "Database: '${SQLITE_DATABASE}'"
+    [[ -f "${checksum_output_filename}.tsv.gz" ]] && rm -f "${checksum_output_filename}.tsv.gz"
+    gzip "${checksum_output_filename}.tsv"
+    [[ "$?" != "0" ]] && error "Error while gzipping checksum index: ${checksum_output_filename}.tsv"
 
-mutex_stop
+}
+
+get_previous_scan_uuid() {
+
+    info "Get previous scan UUID from the database"
+
+    previous_scan_uuid_filename=$( mktemp )
+    info "Created a temporary file: '${previous_scan_uuid_filename}'"
+
+    sqlite3 "${SQLITE_DATABASE}" << EOQ > "${previous_scan_uuid_filename}"
+SELECT scan_uuid
+FROM fs_scan_history
+ORDER BY id DESC
+LIMIT 1;  
+EOQ
+
+    previous_scan_uuid=$(cat "${previous_scan_uuid_filename}")
+    [[ -z "${previous_scan_uuid}" ]] && previous_scan_uuid="${scan_uuid}"
+    info "Previous scan UUID: ${previous_scan_uuid}"
+
+}
+
+register_scan_in_db() {
+
+    info "Registering scan in the scan history"
+
+    sqlite3 "${SQLITE_DATABASE}" << EOQ
+INSERT INTO fs_scan_history (
+  scan_uuid,
+  hostname,
+  version,
+  scan_time_start,
+  scan_time_finish
+) VALUES (
+  "${scan_uuid}",
+  "${hostname}",
+  "${VERSION}",
+  DATETIME("${scan_time_start}"),
+  DATETIME("${scan_time_finish}")
+);
+EOQ
+
+}
+
+main() {
+    mutex_start
+
+    scan_time_start=$( date "+%F %T" )
+
+    info "Starting filesystem scan v${VERSION} (${scan_uuid})"
+
+    index_files
+    index_checksums
+
+    scan_time_finish=$( date "+%F %T" )
+
+    info "Scan start time: ${scan_time_start}"
+    info "Scan finish time: ${scan_time_finish}"
+
+    info "Loading collected data into SQLite database"
+
+    init_db
+
+    get_previous_scan_uuid
+
+    register_scan_in_db
+
+    import_results_to_db
+
+    create_views_in_db
+
+    compress_results
+
+    info "Filesystem index: '${index_output_filename}.gz'"
+    info "Checksum index: '${checksum_output_filename}.gz'"
+    info "Database: '${SQLITE_DATABASE}'"
+
+    mutex_stop
+}
+
+main
