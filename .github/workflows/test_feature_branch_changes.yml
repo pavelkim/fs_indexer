@@ -14,21 +14,47 @@ jobs:
 
     steps:
 
-    - name: Check out code
-      uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
-    - name: Install shellcheck
-      run: >-
-        sudo apt-get install shellcheck
+      - name: Install additional packages
+        run: >-
+          sudo apt-get install findutils
 
-    - name: Run shellcheck
-      run: >-
-        shellcheck fs_indexer.sh
+      - name: Check if .version file exists
+        id: version_file_exists
+        run: |
+          if [[ -f .version ]]; then 
+            echo "::set-output name=version_file_exists::true"
+          else 
+            echo "::set-output name=version_file_exists::false" 
+          fi
 
-    - name: Build
-      run: make build
+      - name: Read out .version file
+        if: steps.version_file_exists.outputs.version_file_exists == 'true'
+        id: planned_version
+        run: echo "::set-output name=planned_version::$(cat .version)"
 
-    - name: Run tests
-      run: make test
+      - name: Run shellcheck
+        run: >-
+          shellcheck fs_indexer.sh
+
+      - name: Build
+        run: make build
+
+      - name: Run tests
+        run: make test
+
+      - name: Define artifact name
+        id: define_artifact_name
+        shell: bash
+        run: |
+          echo "::set-output name=artifact_name::fs_indexer-${{ steps.planned_version.outputs.planned_version }}-test-results-${GITHUB_RUN_ID}.tar.gz"
+
+      - name: Upload test results as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.define_artifact_name.outputs.artifact_name }}
+          path: /tmp/fs_indexer-${{ steps.planned_version.outputs.planned_version }}-test-results.tar.gz
