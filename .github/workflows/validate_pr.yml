@@ -103,7 +103,7 @@ jobs:
         -H 'authorization: Bearer ${{secrets.GITHUB_TOKEN}}' \
         -H "Accept: application/vnd.github.v3+json" \
         --url "${URL}" \
-        -d "{\"labels\":["RELEASEABLE"]}"
+        -d "{\"labels\":[\"RELEASEABLE\"]}"
 
     - name: Comment new version on the pull request
       id: comment_pr
