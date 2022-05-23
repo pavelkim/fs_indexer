@@ -105,6 +105,8 @@ jobs:
         --url "${URL}" \
         -d "{\"labels\":[\"RELEASEABLE\"]}"
 
+- f
+f
     - name: Comment new version on the pull request
       id: comment_pr
       run: |
