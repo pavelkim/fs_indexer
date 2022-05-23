@@ -162,7 +162,7 @@ index_files() {
     info "Starting file indexing"
     info "Indexing output file: ${index_output_filename}"
     
-    chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
+    find "${SCAN_ROOT}" "${find_exceptions[@]}" -printf "${find_printf_format}" > "${index_output_filename}" 2>"${checksum_output_logfile}"
     [[ "$?" != "0" ]] && warning "There were errors during building the index. Look into the logfile: '${checksum_output_logfile}'"
     info "Finished file indexing"
 
@@ -173,7 +173,7 @@ index_checksums() {
     info "Starting checksum indexing"
     info "Indexing output file: ${checksum_output_filename}"
 
-    chroot "${SCAN_ROOT}" find / "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
+    find "${SCAN_ROOT}" "${find_exceptions[@]}" -type f -exec md5sum {} \; > "${checksum_output_filename}" 2>"${index_output_logfile}"
     [[ "$?" != "0" ]] && warning "There were errors during building checksums. Look into the logfile: '${index_output_logfile}'"
     info "Finished checksum indexing"
 
